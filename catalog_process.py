@@ -1,7 +1,7 @@
 import pandas as pd
 from cosmo_tools import *
 
-def get_cat_df():
+def get_cat_df(fname = 'data_catalog/SIDES_cats.p', ftype = 'pickle'):
     '''
     retrive the catalog to a pandas df. 
     Throw out the unnecessary broad band flux data, convert the line flux to unit [Jy GHz]
@@ -10,17 +10,24 @@ def get_cat_df():
     =========
     df: preprocessed data frame.
     '''
-    fname = 'data_catalog/SIDES_with_lines_CO_CII.csv'
-    df_all = pd.read_csv(fname)
 
-    df = df_all[['redshift', 'ra', 'dec', 'Mhalo', 'Mstar', 'qflag', 'SFR', 'mu', 'issb', 'Umean',\
-    'DL', 'ICO10', 'ICO21', 'ICO32', 'ICO43', 'ICO54', 'ICO65', 'ICO76', 'ICO87', 'ICII']].copy()
+    if ftype == 'pickle':
+        df_all = pickle.load(open(fname, "rb"))
+    elif ftype == 'csv':
+        df_all = pd.read_csv(fname)
+    else:
+        raise ValueError('ftype has to be pickle or csv!!')
 
-    # convert I columns in [Jy km s^-1] to flux in [Jy GHz]
-    df['ICII'] = 3.445e-6 * spec_lines.CII.to(u.GHz, equivalencies=u.spectral()).value * df['ICII']
+    df = df_all[['redshift', 'ra', 'dec', 'Mhalo', 'Mstar', 'qflag', 'SFR', 'issb', 'mu', 'Dlum', 'Umean',\
+                 'ICO10', 'ICO21', 'ICO32', 'ICO43', 'ICO54', 'ICO65', 'ICO76', 'ICO87','ICII']].copy()
+
+    #convert I columns in [Jy km s^-1] to flux in [Jy GHz]
+    nu_obs = spec_lines.CII.to(u.GHz, equivalencies=u.spectral()).value / (1 + df['redshift'])
+    df['ICII'] = df['mu'] * df['ICII'] * nu_obs / const.c.to(u.km / u.s).value
     for jco in range(1,9,1):
         name = 'ICO' + str(jco) + str(jco-1)
-        df[name] = 3.445e-6 * spec_lines.CO(jco).to(u.GHz, equivalencies=u.spectral()).value * df[name] / (1 + df['redshift'])
+        nu_obs = spec_lines.CO(jco).to(u.GHz, equivalencies=u.spectral()).value / (1 + df['redshift'])
+        df[name] = df['mu'] * df[name] * nu_obs / const.c.to(u.km / u.s).value
     
     return df
 

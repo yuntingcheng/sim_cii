@@ -65,14 +65,22 @@ def Ivox_from_zsrc(zsrc_all, dth, nu_binedges, juse, jtarg, Lsrc, sigL = [], Lra
     dth: pixel size dth^2 [arcmin]
     nu_binedges: [GHz]
     juse[list]: list of lines in the light cone
-    jtarg[int]: targeting line 
+    jtarg[int or list]: targeting line 
     Lsrc[list]: the intrinsic luminosity of line for all sources [L_sun] 
     Lratio[list]: the intrinsic line luminosity of the individual source is Lratio time Lsrc.
                   Lratio has to be same dimension of zsrc_all. Default: all 1's.
+    Outputs:
+    ========
+    I_vec_all: intensity from all the lines, Nsamp x Nnu array [Jy/sr]
+    I_vec_all: intensity from target lines, Nsamp x Nnu array [Jy/sr]
     '''
     
-    if jtarg not in juse:
-        raise ValueError("jtarg must be in juse.")
+    if type(jtarg) is int:
+        if jtarg not in juse:
+            raise ValueError("jtarg must be in juse.")
+    else:
+        if not set(jtarg).issubset(juse):
+            raise ValueError("jtarg must be in juse.")        
         
     if len(Lratio) == 0:
         Lratio = np.ones(len(zsrc_all))
@@ -90,8 +98,6 @@ def Ivox_from_zsrc(zsrc_all, dth, nu_binedges, juse, jtarg, Lsrc, sigL = [], Lra
     dnus = abs(nu_binedges[1:] - nu_binedges[:-1])
     L_vec = Lsrc * u.Lsun
     
-    idxtarg = juse.index(jtarg)
-    
     usename = []
     for jco in juse:
         if jco==0:
@@ -100,11 +106,21 @@ def Ivox_from_zsrc(zsrc_all, dth, nu_binedges, juse, jtarg, Lsrc, sigL = [], Lra
             usename.extend(['binCO' + str(jco) + str(jco-1)])
     
     I_vec_all = np.zeros([Nset,Nnu])
-    I_vec_targ = np.zeros([Nset,Nnu])
+    
+    if type(jtarg) is int:
+        idxtarg = juse.index(jtarg)
+        I_vec_targ = np.zeros([Nset,Nnu])
+    else:
+        idxtarg_vec = [juse.index(jj) for jj in jtarg]
+        I_vec_targ = np.zeros([len(jtarg),Nset,Nnu])
+        
     for i in range(Nset):
         if len(zsrc_all[i])==0:
             I_vec_all[i,:] = 0.
-            I_vec_targ[i,:] = 0.
+            if type(jtarg) is int:
+                I_vec_targ[i,:] = 0.
+            else:
+                I_vec_targ[:,i,:] = 0.
         else:
             Lri = np.asarray(Lratio[i])
             dfi = pd.DataFrame(zsrc_all[i],columns=['redshift'])
@@ -127,14 +143,22 @@ def Ivox_from_zsrc(zsrc_all, dth, nu_binedges, juse, jtarg, Lsrc, sigL = [], Lra
 
             I_vec = np.histogram(bin_arr,bins = np.arange(-0.5,Nnu,1), weights=I_arr)[0]
             I_vec_all[i,:] = I_vec
-
-            I_vec = np.histogram(bin_arr[:,idxtarg],bins = np.arange(-0.5,Nnu,1), \
-                                 weights=I_arr[:,idxtarg])[0]
-            I_vec_targ[i,:] = I_vec
+            
+            if type(jtarg) is int:
+                I_vec = np.histogram(bin_arr[:,idxtarg],bins = np.arange(-0.5,Nnu,1), \
+                                     weights=I_arr[:,idxtarg])[0]
+                I_vec_targ[i,:] = I_vec
+            else:
+                for jj,idxtarg in enumerate(idxtarg_vec):
+                    I_vec = np.histogram(bin_arr[:,idxtarg],bins = np.arange(-0.5,Nnu,1), \
+                                         weights=I_arr[:,idxtarg])[0]
+                    I_vec_targ[jj,i,:] = I_vec
+                    
         
         if verbose:
             if (i+1)%100==0:
                 print('produce light cone %d/%d (%d %%)'%(i+1,Nset,(i+1)*100./Nset))
+    
     return I_vec_all,I_vec_targ
 
 def gen_Ipred(z_coords, N_arr, dth, nu_binedges, juse, jtarg, Lsrc, verbose = 0):
@@ -150,8 +174,6 @@ def gen_Ipred(z_coords, N_arr, dth, nu_binedges, juse, jtarg, Lsrc, verbose = 0)
     juse[list]: list of lines in the light cone
     jtarg[int]: targeting line 
     Lsrc[list]: the intrinsic luminosity of line for all sources [L_sun] 
-    Lratio[list]: the intrinsic line luminosity of the individual source is Lratio time Lsrc.
-                  Lratio has to be same dimension of zsrc_all. Default: all 1's.
     '''
 
     Nsamp, Nz = N_arr.shape
@@ -166,9 +188,10 @@ def gen_Ipred(z_coords, N_arr, dth, nu_binedges, juse, jtarg, Lsrc, verbose = 0)
         Lratio.append(N_arr[i,:])
         
     Ipred_all, Ipred_targ = Ivox_from_zsrc\
-                    (zsrc_all, dth, nu_binedges, juse, jtarg, Lsrc, Lratio = Lratio,verbose = 0)
+                    (zsrc_all, dth, nu_binedges, juse, jtarg, Lsrc, Lratio = Lratio, verbose = 0)
     
     return Ipred_all, Ipred_targ
+
 
 def zround(z_true, z_coords):
     zround = []
@@ -217,10 +240,10 @@ def Neff_tot( dth, zmin = 0, zmax = 10):
 
     return Ntot
 
-def Neff_tot_idx(dth, z_coords_all, z_idx):
+def Neff_tot_idx(dth, z_coords):
     '''
-    The integrated Neff in z range specified by z_idx in z_coords_all.
-    z_coords_all must be a linspace array
+    The integrated Neff in z range specified by z_coords.
+    z_coords must be a linspace array, but not need to be continuous
     '''
     dfNeff = pd.read_csv('data_internal/Neff.txt')
     z_dat = dfNeff['z'].values
@@ -228,10 +251,13 @@ def Neff_tot_idx(dth, z_coords_all, z_idx):
     Neff_dat *= dth**2
     tck = interpolate.splrep(z_dat, Neff_dat, s=0)
 
-    Nbins_arr = interpolate.splev(z_coords_all, tck, der=0)
+    Nbins_arr = interpolate.splev(z_coords, tck, der=0)
     Nbins_arr[Nbins_arr < 0] = 0
-    dz = z_coords_all[1] - z_coords_all[0]
     
-    Ntot = np.sum(Nbins_arr[z_idx]) * dz
-
+    dz_vec = z_coords[1:] - z_coords[:-1]
+    values,counts = np.unique(dz_vec, return_counts=True)
+    dz = values[np.argmax(counts)]   
+    
+    Ntot = np.sum(Nbins_arr) * dz
+    
     return Ntot

@@ -4,6 +4,7 @@ import copy
 from astropy import units as u
 from astropy import constants as const
 from astropy import cosmology
+import pickle
 from hmf import MassFunction
 
 
@@ -162,8 +163,9 @@ class cosmo_dist:
         self.comoving_transverse_distance = self._hdist(cosmo.comoving_transverse_distance(z))
         self.kpc_comoving_per_arcmin = self._hdist(cosmo.kpc_comoving_per_arcmin(z))
         self.kpc_proper_per_arcmin = self._hdist(cosmo.kpc_proper_per_arcmin(z))
-        self.arcsec_per_kpc_comoving = self._hdist_inv(cosmo.arcsec_per_kpc_comoving(z))
-        self.arcsec_per_kpc_proper = self._hdist_inv(cosmo.arcsec_per_kpc_proper(z))
+        if 0 not in np.array(z):
+            self.arcsec_per_kpc_comoving = self._hdist_inv(cosmo.arcsec_per_kpc_comoving(z))
+            self.arcsec_per_kpc_proper = self._hdist_inv(cosmo.arcsec_per_kpc_proper(z))
     
     def _hdist(self, d):
         return d * self.h / u.h
@@ -181,7 +183,9 @@ class spec_lines():
         self.Ha = 0.6563 * u.um
         self.Hb = 0.4861 * u.um
         self.HI = 211061.140542 * u.um
-    
+        self.OII = 0.3727 * u.um
+        self. OIII = 0.5007 * u.um
+        
     def _CO(self, J = 1):
         return 2610./J * u.um
     

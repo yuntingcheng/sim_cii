@@ -121,18 +121,17 @@ class make_Icube_line():
         z_vec = np.array(self.df['redshift'])
         ra_vec = np.array(self.df['ra'])
         dec_vec = np.array(self.df['dec'])
-        mu_vec = np.array(self.df['mu'])
   
-        # retrieve I_vec [Jy GHz] of the line, and apply the lensing magnification
+        # retrieve I_vec [Jy GHz] of the line
         if linename=='cii':
-            I_vec = np.array(self.df['ICII']) * mu_vec
+            I_vec = np.array(self.df['ICII'])
             freq_rest = spec_lines.CII.to(u.GHz, equivalencies = u.spectral()).value
             name = 'CII'
         elif linename=='co':
             if jco not in np.arange(1,9,1,dtype=int):
                 print('jco data not exist! (jco best be in [1,2,...,8])')
                 return
-            I_vec = np.array(self.df['ICO' + str(jco) + str(jco-1)]) * mu_vec
+            I_vec = np.array(self.df['ICO' + str(jco) + str(jco-1)])
             freq_rest = spec_lines.CO(jco).to(u.GHz, equivalencies = u.spectral()).value
             name = 'CO(' + str(jco) + '-' + str(jco-1) + ')'
             
@@ -234,13 +233,13 @@ def _select_df(line_class,df):
     Outputs:
     ========
     line_class.df: new data frame with sources inside the cube and columns:
-    ['redshift', 'ra', 'dec', 'issb', 'Umean', 'mu',\
-           'ICO10', 'ICO21', 'ICO32', 'ICO43', 'ICO54', 'ICO65', 'ICO76', 'ICO87', 'ICII']
+    ['redshift', 'ra', 'dec', ...]
     '''
     df_new = df[(df.ra >= line_class.xmin) & (df.ra <= line_class.xmax) & \
                 (df.dec >= line_class.ymin) & (df.dec <= line_class.ymax)].copy()
     df_new = df_new[['redshift', 'ra', 'dec', 'issb', 'Umean','mu',\
-           'ICO10', 'ICO21', 'ICO32', 'ICO43', 'ICO54', 'ICO65', 'ICO76', 'ICO87', 'ICII']].copy()
+           'Dlum','ICO10', 'ICO21', 'ICO32', 'ICO43', 'ICO54', 'ICO65', 'ICO76', 'ICO87', 'ICII']].copy()
+
     line_class.df = df_new
     return
 
