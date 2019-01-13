@@ -68,7 +68,7 @@ class spherex_param:
     0.75 - 1.11 um R = 41
     1.11 - 1.64 um R = 41
     1.64 - 2.42 um R = 41
-    2.52 - 3.82 um R = 35
+    2.42 - 3.82 um R = 35
     3.82 - 4.42 um R = 110
     4.42 - 5.00 um R = 130
     '''
@@ -131,9 +131,9 @@ class spherex_param:
         Om_pix = (self.dth * u.arcmin.to(u.rad))**2
         
         F_all = (3631. * 10**(-19.5 / 2.5)) / 5.
-        self.NEI_all = F_all / Om_pix * np.sqrt(self.Neff)
+        self.NEI_all = F_all / Om_pix / np.sqrt(self.Neff)
         F_deep = (3631. * 10**(-22 / 2.5)) / 5.
-        self.NEI_deep = F_deep / Om_pix * np.sqrt(self.Neff)
+        self.NEI_deep = F_deep / Om_pix / np.sqrt(self.Neff)
         return
     
     def cmv_config(self, linename):

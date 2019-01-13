@@ -1,4 +1,205 @@
 from cosmo_tools import *
+import pandas as pd
+
+def SFR_Be13(z, M_arr = []):
+    '''
+    Behroozi et al. 2013 SFR(M, z) function. 
+    https://arxiv.org/pdf/1207.6105.pdf
+    data downloaded from:
+    https://www.peterbehroozi.com/data.html
+    
+    Input:
+    ======
+    M_arr: halo mass [Msun / h]
+    z: redshift
+    
+    Output:
+    =======
+    M_arr: halo mass [Msun / h]
+    sfr_arr: [Msun / yr]
+    '''
+    # get data
+    df = pd.read_csv('data/Behroozi_SFR/sfr/sfr_release.dat', sep = ' ',\
+                     skiprows = 2, names=['z','M','SFR','MSM'])
+    df['z'].update(df['z'] - 1)
+    df.drop(['MSM'], axis = 1, inplace = True)
+    dfg = df.groupby('z')
+    z_arr = np.sort(list(dfg.groups))
+    
+    # interpolate to the given redshift
+    if z == 0:
+        z1 = z_arr[0]
+        z2 = z_arr[1]
+    elif z >= z_arr[-1]:
+        z1 = z_arr[-2]
+        z2 = z_arr[-1]
+    else:
+        z1 = z_arr[np.searchsorted(z_arr, z) - 1]
+        z2 = z_arr[np.searchsorted(z_arr, z)]
+        
+    group1 = dfg.get_group(z1)
+    group2 = dfg.get_group(z2)
+    logM_dat = group1.M.values + np.log10(cosmo.h) # log10(M)[Msun / h]
+    logSFR_dat1 = group1.SFR.values # log10(SFR)[Msun/yr]
+    logSFR_dat2 = group2.SFR.values # log10(SFR)[Msun/yr]
+    logSFR_dat = logSFR_dat1 + (logSFR_dat2 - logSFR_dat1) * (z - z1) / (z2 - z1)
+    
+    if z > z_arr[-1]:
+        logSFR_dat = logSFR_dat2
+    
+    # interpolate to the assigned M_arr
+    if len(M_arr) == 0:
+        M_arr = np.logspace(8, 15, 1000)
+    else:
+        M_arr = np.array(M_arr)
+    logM_arr = np.log10(M_arr)
+    logSFR_arr = np.interp(logM_arr, logM_dat, logSFR_dat)
+    
+    # For M < min M in data, use linear extrapolation
+    
+    logSFR_arr_ex = np.poly1d(np.polyfit(logM_dat[:2], logSFR_dat[:2],1))(logM_arr)
+    logSFR_arr[logM_arr < logM_dat[0]] = logSFR_arr_ex[logM_arr < logM_dat[0]]
+    
+    logSFR_arr[logSFR_arr < -20] = -20.
+    SFR_arr = 10**logSFR_arr
+    SFR_arr[SFR_arr < 1e-19] = 0
+    M_arr = 10**logM_arr
+    
+    return SFR_arr, M_arr
+
+
+def SFR_func_Be13(z, sfr_arr = []):
+    '''
+    SFR func (dn/dSFR) in Be13 model.
+        
+    Input:
+    ======
+    z: redshift
+    sfr_arr: SFR/SFR* [dimensionless]
+    
+    Output:
+    =======
+    dnd(sfr_arr/sfrs): SFR func dn/dSFR [h^3 / Mpc^3]
+    sfr_arr: SFR/SFR* [dimensionless]
+    sfrs: [Msun / yr]
+    Neff: [h^3 / Mpc^3]
+    sfrd: SFRD [h^3 / Mpc^3 / (Msun / yr)]
+    '''
+
+    if len(sfr_arr) == 0:
+        sfr_arr = np.logspace(-3, 1, 1000)
+    else:
+        sfr_arr = np.array(sfr_arr)
+
+    SFRbinedges_arr, Mbinedges_arr = SFR_Be13(z)
+    sp0 = np.where(SFRbinedges_arr != 0)[0]
+    SFRbinedges_arr = SFRbinedges_arr[sp0]
+    Mbinedges_arr = Mbinedges_arr[sp0]
+    SFRbins_arr = np.sqrt(SFRbinedges_arr[1:] * SFRbinedges_arr[:-1])
+    Mbins_arr = np.sqrt(Mbinedges_arr[1:] * Mbinedges_arr[:-1])
+    dMbins_arr = Mbinedges_arr[1:] - Mbinedges_arr[:-1]
+    hmfz = HMFz(z)
+    dndm_arr, _ = hmfz.dndm(m_arr = Mbins_arr)
+    dn_arr = dndm_arr * dMbins_arr
+    
+    SFRbinedges_dat = np.logspace(np.log10(min(SFRbinedges_arr)),\
+                                  np.log10(max(SFRbinedges_arr)), 51)
+    SFRbins_dat = np.sqrt(SFRbinedges_dat[1:] * SFRbinedges_dat[:-1])
+    dndSFR_dat = np.histogram(SFRbins_arr, bins = SFRbinedges_dat, weights = dn_arr)[0]
+    dndSFR_dat /= (SFRbinedges_dat[1:] - SFRbinedges_dat[:-1])
+    
+    # calculate Neff, sfrs, SFRD
+    dlnSFR = np.log(SFRbins_dat[1]) - np.log(SFRbins_dat[0])
+    sfrd = np.sum(dndSFR_dat * SFRbins_dat**2) * dlnSFR
+    SFRsum2 = np.sum(dndSFR_dat * SFRbins_dat**3) * dlnSFR
+    Neff = sfrd**2 / SFRsum2
+    sfrs = SFRsum2 / sfrd
+    
+    # interpolate to the input sfr_arr
+    SFRbins_dat /= sfrs
+    dndSFR_dat *= sfrs
+    
+    dndsfr_arr = np.zeros_like(sfr_arr)
+    sp = np.where((sfr_arr >= SFRbins_dat[0]) & (sfr_arr <= SFRbins_dat[-1]))[0]
+    spn = np.where((sfr_arr < SFRbins_dat[0]))[0]
+    spp = np.where((sfr_arr > SFRbins_dat[-1]))[0]
+    
+    x = np.log(SFRbins_dat[dndSFR_dat > 0])
+    y = np.log(dndSFR_dat[dndSFR_dat > 0])
+    dndsfr_arr[sp] = np.exp(np.interp(np.log(sfr_arr[sp]), x, y))
+    dndsfr_arr[spp] = 0.
+    dndsfr_arr[spn] = np.exp(y[0]+(np.log(sfr_arr[spn])-x[0])*(y[1]-y[0])/(x[1]-x[0]))
+
+    return dndsfr_arr, sfr_arr, sfrs, Neff, sfrd
+
+def SFRs_Be13(z):
+    '''
+    Return SFRD of Be13 model.
+    Inputs:
+    =======
+    z: redshift, for z between the listed data, the Schechter params are linearly interpolate.
+
+    Output:
+    =======
+    SFRs: [Msun / yr]
+
+    '''
+    _, _, sfrs, _, _ = SFR_func_Be13(z)
+    return sfrs
+
+
+def SFRD_Be13(z):
+    '''
+    Return SFRs of Be13 model.
+    Inputs:
+    =======
+    z: redshift, for z between the listed data, the Schechter params are linearly interpolate.
+
+    Output:
+    =======
+    sfrd: SFRD [h^3 / Mpc^3 / (Msun / yr)]
+
+    '''
+    M_arr = np.logspace(8, 15, 1000)
+    dlnm = np.log(M_arr)[1] - np.log(M_arr)[0]
+    
+    hmfz = HMFz(z)
+    dndlnm_arr, _ = hmfz.dndlnm(m_arr = M_arr)
+    
+    SFR_arr,_ = SFR_Be13(z, M_arr)
+    SFRD = np.sum(dlnm * dndlnm_arr * SFR_arr)
+    
+    return SFRD
+
+def Neff_Be13(z, unit = 'obs'):
+    '''
+    Calculate Neff from Be13 model.
+    
+    Neff = <L>^2 / <L^2>
+
+    Inputs:
+    =======
+    z: redshift, for z between the listed data, the Schechter params are linearly interpolate.
+    unit: 'obs'-- Neff per comoving volume[(h/Mpc)^3] 
+          'cmv' -- Neff per arcmin^2 per z [1/(arcmin)^2/dz]
+    
+    Output:
+    =======
+    Neff
+    
+    '''
+
+    _, _, _, Neff, _ = SFR_func_Be13(z)
+    if unit == 'cmv':
+        return Neff
+    else:
+        Neff = Neff * cosmo.h**3 * (u.Mpc)**-3
+        dA = (cosmo.kpc_comoving_per_arcmin(z).to(u.Mpc / u.arcmin))**2
+        dchi_dz = (const.c / cosmo.H(z)).to(u.Mpc)
+        dV = dA * dchi_dz
+        Neff *= dV
+        Neff = Neff.value
+        return Neff
 
 def SFR_F17(z, M_arr = []):
     '''
@@ -78,8 +279,8 @@ def SFR_func_F17(z, sfr_arr = []):
     
     Output:
     =======
-    dndsfr_arr: SFR func dn/dSFR [h^3 / Mpc^3 / (Msun / yr)]
-    sfr_arr: [Msun / yr]
+    dnd(sfr_arr/sfrs): SFR func dn/dSFR [h^3 / Mpc^3]
+    sfr_arr: SFR/SFR*[]
     sfrs: [Msun / yr]
     Neff: [h^3 / Mpc^3]
     sfrd: SFRD [h^3 / Mpc^3 / (Msun / yr)]
@@ -161,7 +362,7 @@ def SFR_func_F17(z, sfr_arr = []):
     x = np.log(sfr_arr1)
     y = np.log(dndsfr_arr1)
     dndsfr_arr[sp] = np.exp(np.interp(np.log(sfr_arr[sp]), x, y))
-    dndsfr_arr[spp] = np.exp(y[-1]+(np.log(sfr_arr[spp])-x[-1])*(y[-1]-y[-2])/(x[-1]-x[-2]))
+    dndsfr_arr[spp] = 0.#np.exp(y[-1]+(np.log(sfr_arr[spp])-x[-1])*(y[-1]-y[-2])/(x[-1]-x[-2]))
     dndsfr_arr[spn] = np.exp(y[0]+(np.log(sfr_arr[spn])-x[0])*(y[1]-y[0])/(x[1]-x[0]))
     
     return dndsfr_arr, sfr_arr, sfrs, Neff, sfrd

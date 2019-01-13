@@ -1,47 +1,5 @@
 from lightcone_sim_F17 import *
-from sklearn import preprocessing
 import cvxpy as cvx
-
-def sparse_dict(dth, nu_binedges, line_use, dz = 0.0005):
-
-    z_coords_all = np.arange(dz,10,dz)
-    z_coords_all_list = z_coords_all.reshape(len(z_coords_all),-1).tolist()
-    I_coords_all,_ = Ivox_from_zsrc(z_coords_all_list, dth, nu_binedges, line_use, "Lya", verbose=0)
-    I_coords_all = I_coords_all.T
-    z_coords_type_all = np.count_nonzero(I_coords_all, axis=0)
-
-    I_bl = np.copy(I_coords_all)
-    I_bl[I_bl > 0] = 1
-    
-    # dict for multiple bins
-    z_coords = []
-    z_idx = []
-    ztemp = []
-    for i,z in enumerate(z_coords_all):
-        if len(ztemp) != 0 and np.array_equal(I_bl[:,i],I_bl[:,i-1]):
-            ztemp.append(z)
-        elif len(ztemp) != 0 and not np.array_equal(I_bl[:,i],I_bl[:,i-1]) and np.sum(I_bl[:,i]) >= 1:
-            z_median = np.percentile(ztemp,50, interpolation= 'nearest')
-            z_coords.append(z_median)
-            z_idx.append(np.where(z_coords_all == z_median)[0][0])
-            ztemp = [z]
-        elif len(ztemp) != 0 and not np.array_equal(I_bl[:,i],I_bl[:,i-1]) and not np.sum(I_bl[:,i]) >= 1:
-            z_median = np.percentile(ztemp,50, interpolation= 'nearest')
-            z_coords.append(z_median)
-            z_idx.append(np.where(z_coords_all == z_median)[0][0])
-            ztemp = []
-        elif len(ztemp) == 0 and np.sum(I_bl[:,i]) >= 1:
-            ztemp = [z]
-
-    z_idx = np.array(z_idx)
-    z_coords = np.array(z_coords)
-
-    A_raw = I_coords_all[:, z_idx]
-    A, I_norm = preprocessing.normalize(A_raw,axis=0, copy=True, return_norm=True)
-    # A_raw = A @ np.diag(I_norm)
-    N_nu, N_z = A.shape
-
-    return A, I_norm, z_coords, N_nu, N_z, z_coords_all, z_idx, I_coords_all
 
 def run_lasso(A, I_norm, Iobs_all, alpha, fit_bg = False):
     
@@ -100,3 +58,64 @@ def run_lasso(A, I_norm, Iobs_all, alpha, fit_bg = False):
             C_pred = C.value
         
         return N_pred, C_pred
+    
+
+def run_MP(A, I_norm, Iobs_all, e_th, iter_max = 10):
+    
+    N_nu, N_z = A.shape
+    N_lc = Iobs_all.shape[0]
+    N_pred = np.zeros([N_lc, N_z])
+
+    for ilc in range(N_lc):
+        R_arr = Iobs_all[ilc].copy()
+        R = np.sqrt(np.mean(R_arr**2))
+        f_arr = np.zeros(N_nu)
+        NI_arr = np.zeros(N_z)
+        iter_count = 0
+        while True:
+            if (R < e_th) or iter_count == iter_max:
+                break
+            iter_count += 1
+            gamma = np.argmax(np.dot(R_arr.reshape(1,-1), A)[0])
+            amp = np.sum(A[:,gamma] * R_arr)
+            u = amp * A[:,gamma]
+            NI_arr[gamma] += amp
+            R_arr -= u
+            f_arr += u
+            R = np.sqrt(np.mean(R_arr**2))
+
+        N_pred[ilc,:] = NI_arr / I_norm
+        #print('Light cone %d MP end in %d iterations.'%(ilc, iter_count))
+    return N_pred
+
+def run_MP_sig(A, I_norm, Iobs_all, sigI, sig_th, iter_max = 100):
+    
+    N_nu, N_z = A.shape
+    N_lc = Iobs_all.shape[0]
+    N_pred = np.zeros([N_lc, N_z])
+
+    for ilc in range(N_lc):
+        R_arr = Iobs_all[ilc].copy()
+        R = np.sqrt(np.mean(R_arr**2))
+        f_arr = np.zeros(N_nu)
+        NI_arr = np.zeros(N_z)
+        iter_count = 0
+        while True:
+            if iter_count == iter_max:
+                break
+                
+            gamma = np.argmax(np.dot(R_arr.reshape(1,-1), A)[0])
+            amp = np.sum(A[:,gamma] * R_arr)
+
+            if amp < sig_th * sigI:
+                break
+            iter_count += 1
+            u = amp * A[:,gamma]
+            NI_arr[gamma] += amp
+            R_arr -= u
+            f_arr += u
+            R = np.sqrt(np.mean(R_arr**2))
+
+        N_pred[ilc,:] = NI_arr / I_norm
+        #print('Light cone %d MP end in %d iterations.'%(ilc, iter_count))
+    return N_pred
