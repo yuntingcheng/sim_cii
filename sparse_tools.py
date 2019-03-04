@@ -2,6 +2,7 @@ from sklearn import preprocessing
 import cvxpy as cvx
 from scipy import special
 from lightcone_toy_p16 import *
+from lightcone_sim_P16 import *
 #from lightcone_sim import *
 #from lightcone_sim_Sch import *
 
@@ -166,6 +167,43 @@ def sparse_dict(dth, nu_binedges, juse, dz = 0.0005):
     N_nu, N_z = A.shape
 
     return A, I_norm, z_coords, N_nu, N_z, sp2, z_coords_all, z_idx, I_coords_all
+
+
+def run_MP_sig(A, I_norm, Iobs_all, sigI, sig_th, iter_max = 500, return_iter = False):
+    
+    N_nu, N_z = A.shape
+    N_lc = Iobs_all.shape[0]
+    N_pred = np.zeros([N_lc, N_z])
+
+    for ilc in range(N_lc):
+        R_arr = Iobs_all[ilc].copy()
+        R = np.sqrt(np.mean(R_arr**2))
+        f_arr = np.zeros(N_nu)
+        NI_arr = np.zeros(N_z)
+        iter_count = 0
+        while True:
+            if iter_count == iter_max:
+                break
+                
+            gamma = np.argmax(np.dot(R_arr.reshape(1,-1), A)[0])
+            amp = np.sum(A[:,gamma] * R_arr)
+
+            if amp < sig_th * sigI:
+                break
+            iter_count += 1
+            u = amp * A[:,gamma]
+            NI_arr[gamma] += amp
+            R_arr -= u
+            f_arr += u
+            R = np.sqrt(np.mean(R_arr**2))
+
+        N_pred[ilc,:] = NI_arr / I_norm
+        
+        if return_iter:
+            return N_pred[:,:N_z - N_nu], iter_count
+        #print('Light cone %d MP end in %d iterations.'%(ilc, iter_count))
+    return N_pred[:,:N_z - N_nu]
+
 
 def run_lasso(A, I_norm, Iobs_all, alpha, sp2, fit_bg = False):
     

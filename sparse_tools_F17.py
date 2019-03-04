@@ -88,7 +88,7 @@ def run_MP(A, I_norm, Iobs_all, e_th, iter_max = 10):
         #print('Light cone %d MP end in %d iterations.'%(ilc, iter_count))
     return N_pred
 
-def run_MP_sig(A, I_norm, Iobs_all, sigI, sig_th, iter_max = 100):
+def run_MP_sig(A, I_norm, Iobs_all, sigI, sig_th, iter_max = 100, return_iter = False):
     
     N_nu, N_z = A.shape
     N_lc = Iobs_all.shape[0]
@@ -117,5 +117,8 @@ def run_MP_sig(A, I_norm, Iobs_all, sigI, sig_th, iter_max = 100):
             R = np.sqrt(np.mean(R_arr**2))
 
         N_pred[ilc,:] = NI_arr / I_norm
+        
+        if return_iter:
+            return N_pred, iter_count
         #print('Light cone %d MP end in %d iterations.'%(ilc, iter_count))
     return N_pred

@@ -138,7 +138,7 @@ class spherex_param:
     
     def cmv_config(self, linename):
         _get_cmv_config(self, linename)
-        return    
+        return
 
 class survey1_param:
     def __init__(self):
