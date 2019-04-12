@@ -108,6 +108,7 @@ def Neff_P16(z, jco, unit = 'obs'):
     Ltot = np.sum(Lbins_arr * Phibins_arr * dL_arr)
     L2tot = np.sum(Lbins_arr**2 * Phibins_arr * dL_arr)
     Neff = Ltot**2 / L2tot
+    
     if unit == 'cmv':
         return Neff
     else:
@@ -119,7 +120,7 @@ def Neff_P16(z, jco, unit = 'obs'):
         Neff = Neff.value
         return Neff
 
-def sim_Llc_P16(Nsamp, dth, zbinedges = [], Lbinedges = [], jco = 1):
+def sim_Llc_P16(Nsamp, dth, zbinedges = [], Lbinedges = [], jco = 1, Neff_scale = 1):
     '''
     Simulate the light cone with Popping et al. 2016 luminosity function. 
     
@@ -156,12 +157,14 @@ def sim_Llc_P16(Nsamp, dth, zbinedges = [], Lbinedges = [], jco = 1):
     dL_lvec = (Lbinedges[1:] - Lbinedges[:-1])
     
     L_arr = np.zeros([Nsamp,Nz])
+    N_arr = np.zeros([Nsamp,Nz])
     for iz,z in enumerate(zbins):
         Phi_lvec, _ , Ls = LF_P16(z, jco, Lbins)
-        Navg_lvec = Phi_lvec * dV_zvec[iz].value * dL_lvec
-        N_arr = np.random.poisson(Navg_lvec, size = (Nsamp, NL))
-        Ltot_svec = np.matmul(N_arr,Lbins.reshape([NL,-1])).flatten()
+        Navg_lvec = Phi_lvec * dV_zvec[iz].value * dL_lvec * Neff_scale
+        Nsim_arr = np.random.poisson(Navg_lvec, size = (Nsamp, NL))
+        Ltot_svec = np.matmul(Nsim_arr,Lbins.reshape([NL,-1])).flatten()
         Ltot_svec *= Ls
         L_arr[:,iz] = Ltot_svec
+        N_arr[:,iz] = Ltot_svec / Ls
     
-    return L_arr, zbins
+    return L_arr, N_arr, zbins

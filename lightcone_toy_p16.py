@@ -1,6 +1,7 @@
 import pandas as pd
 from survey_params import *
 from scipy import interpolate
+from lightcone_sim_P16 import *
 
 def sim_zsrc_Neff(Nsamp, dth, zmin = 0, zmax = 10, dz = 0.001, Neff_scale = 1):
     '''
@@ -251,6 +252,7 @@ def gen_Ipred(z_coords, N_arr, dth, nu_binedges, juse, jtarg, verbose = 0):
     
     return Ipred_all, Ipred_targ
 
+
 def zround(z_true, z_coords):
     zround = []
     zidx = []
@@ -260,19 +262,27 @@ def zround(z_true, z_coords):
         zidx.append(idx)
     return zround, zidx
     
-def zlist_to_N(zsrc, z_coords_all, I_coords_all, z_idx, sp2):
+def zlist_to_N(zsrc, z_coords_all, I_coords_all, z_idx, sp2, Nsrc = []):
     I_bl = np.copy(I_coords_all)
     I_bl[I_bl > 0] = 1
     Nall = np.zeros([len(zsrc),len(z_idx)])
+    if len(Nsrc) == 0:
+        Nsrc = [[1]*len(zsrc[i]) for i in range(len(zsrc))]
     for iset in range(len(zsrc)):
-        N = np.zeros_like(z_idx)
-        idx_vec = np.array([(np.abs(zcii - z_coords_all)).argmin() for zcii in zsrc[iset]])
-        idx_vec = idx_vec[np.sum(I_bl[:,idx_vec], axis = 0) >= 2]
-        for idx in idx_vec:
+        N = np.zeros_like(z_idx, dtype = 'float')
+        idx_vec_all = np.array([(np.abs(zcii - z_coords_all)).argmin() for zcii in zsrc[iset]])
+        Nsrci = []
+        idx_vec = []
+        for i in range(len(idx_vec_all)):
+            if np.sum(I_bl[:,idx_vec_all[i]], axis = 0) >= 2:
+                idx_vec.append(idx_vec_all[i])
+                Nsrci.append(Nsrc[iset][i])
+        
+        for isrc,idx in enumerate(idx_vec):
             if idx <= min(z_idx[sp2]):
-                N[0] += 1
+                N[0] += Nsrci[isrc]
             elif idx >= max(z_idx[sp2]):
-                N[-1] += 1
+                N[-1] += Nsrci[isrc]
             else:
                 # pick the two neaest dictionary
                 idx1 = idx - z_idx[sp2]
@@ -285,9 +295,9 @@ def zlist_to_N(zsrc, z_coords_all, I_coords_all, z_idx, sp2):
                 
                 # get binary dict to see which one match
                 if np.array_equal(I_bl[:,idx1],I_bl[:,idx]):
-                    N[np.where(idx1 == z_idx)] += 1
+                    N[np.where(idx1 == z_idx)] += Nsrci[isrc]
                 else:
-                    N[np.where(idx2 == z_idx)] += 1
+                    N[np.where(idx2 == z_idx)] += Nsrci[isrc]
 
         Nall[iset,:] = N
     return Nall
@@ -301,6 +311,21 @@ def gen_lightcone_toy(Nlc, dth, nu_binedges, sp2, z_coords_all, I_coords_all, z_
     
     return Ntrue, Itrue_all, Itrue_targ
 
+def gen_lightcone(Nlc, dth, nu_binedges, sp2, z_coords_all, I_coords_all, z_idx, juse, jtarg, Neff_scale = 1, sigL = []):
+
+    L_arr1, N_arr1, zbins = sim_Llc_P16(Nlc, dth, jco = 1, Neff_scale = Neff_scale)
+    L_arr2, N_arr2, zbins = sim_Llc_P16(Nlc, dth, jco = 0, Neff_scale = Neff_scale)
+    L_arr, N_arr= L_arr1, N_arr1
+    L_arr[:, zbins > 5] = L_arr2[:, zbins > 5]
+    N_arr[:, zbins > 5] = N_arr2[:, zbins > 5]
+    zsrc = [zbins.tolist()]*Nlc
+    Itrue_all, Itrue_targ = Ivox_from_zsrc(zsrc, dth, nu_binedges, juse, jtarg, 
+                                           Lratio = N_arr.tolist(), sigL = sigL, verbose=0)
+    Nsrc = N_arr.tolist()
+    Ntrue = zlist_to_N(zsrc, z_coords_all, I_coords_all, z_idx, sp2, Nsrc = Nsrc)
+    Ntrue = Ntrue[:,sp2]
+    return Ntrue, Itrue_all, Itrue_targ
+    
 def Neff_tot( dth, zmin = 0, zmax = 10):
     '''
     Get the total Neff from zmin to zmax

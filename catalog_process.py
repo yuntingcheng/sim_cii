@@ -1,7 +1,7 @@
 import pandas as pd
 from cosmo_tools import *
 
-def get_cat_df(fname = 'data_catalog/SIDES_cats.p', ftype = 'pickle'):
+def get_cat_df(fname = '/Volumes/Drive/sim_cii/data_catalog/SIDES_cats.p', ftype = 'pickle'):
     '''
     retrive the catalog to a pandas df. 
     Throw out the unnecessary broad band flux data, convert the line flux to unit [Jy GHz]

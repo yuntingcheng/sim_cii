@@ -326,6 +326,7 @@ def zlist_to_N(zsrc, z_coords_all, I_coords_all, z_idx, Nsrc = []):
     for iset in range(len(zsrc)):
         N = np.zeros_like(z_idx, dtype = 'float')
         idx_vec = np.array([(np.abs(zcii - z_coords_all)).argmin() for zcii in zsrc[iset]])
+        idx_vec = idx_vec[np.sum(I_bl[:,idx_vec], axis = 0) >= 2]
         for isrc,idx in enumerate(idx_vec):
             if idx <= min(z_idx):
                 if len(Nsrc) == 0:
@@ -361,6 +362,7 @@ def zlist_to_N(zsrc, z_coords_all, I_coords_all, z_idx, Nsrc = []):
 
         Nall[iset,:] = N
     return Nall
+
 def gen_lightcone_toy(Nlc, dth, nu_binedges, z_coords_all, \
                       I_coords_all, z_idx, line_use, line_targ, Neff_scale = 1, model = 'Be13'):
     

@@ -3,8 +3,6 @@ import cvxpy as cvx
 from scipy import special
 from lightcone_toy_p16 import *
 from lightcone_sim_P16 import *
-#from lightcone_sim import *
-#from lightcone_sim_Sch import *
 
 # def sparse_dict(dth, nu_binedges, nu_bins, juse, Lsrc):
 
