@@ -189,6 +189,9 @@ def add_line_flux(df, line_use = ['Lya', 'Ha', 'Hb', 'OII', 'OIII'], muL = [], s
         L_vec = L_vec * (1 + np.random.normal(muL[jidx], sigL[jidx], len(L_vec)))
         F_vec = L_vec * u.Lsun / 4 / np.pi / DL_vec**2
         F_vec = F_vec.to(u.Jy * u.GHz).value
+        
+        #if line_name=='Lya':##########
+        #    F_vec = F_vec*15###########
         df['F' + line_name] = F_vec
         F_arr[:,jidx] = F_vec
         

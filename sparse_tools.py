@@ -167,40 +167,61 @@ def sparse_dict(dth, nu_binedges, juse, dz = 0.0005):
     return A, I_norm, z_coords, N_nu, N_z, sp2, z_coords_all, z_idx, I_coords_all
 
 
-def run_MP_sig(A, I_norm, Iobs_all, sigI, sig_th, iter_max = 500, return_iter = False):
+def run_MP_sig(A, I_norm, Iobs_all, sigI, sig_th, iter_max = 500, 
+               return_iter = False, return_Rf = False, prior = np.array([])):
     
     N_nu, N_z = A.shape
     N_lc = Iobs_all.shape[0]
     N_pred = np.zeros([N_lc, N_z])
-
+    R_arr = np.zeros(Iobs_all.shape)
+    f_arr = np.zeros(Iobs_all.shape)
     for ilc in range(N_lc):
-        R_arr = Iobs_all[ilc].copy()
-        R = np.sqrt(np.mean(R_arr**2))
-        f_arr = np.zeros(N_nu)
+        R_vec = Iobs_all[ilc].copy()
+        R = np.sqrt(np.mean(R_vec**2))
+        f_vec = np.zeros(N_nu)
         NI_arr = np.zeros(N_z)
         iter_count = 0
+        
+        if len(prior) > 0:
+            gammas = np.where(prior[ilc,:]!=0)[0]
+            for gamma in gammas:
+                amp = np.sum(A[:,gamma] * R_vec)
+                iter_count += 1
+                u = amp * A[:,gamma]
+                NI_arr[gamma] += amp
+                R_vec -= u
+                f_vec += u
+                R = np.sqrt(np.mean(R_vec**2))
+        
         while True:
             if iter_count == iter_max:
                 break
                 
-            gamma = np.argmax(np.dot(R_arr.reshape(1,-1), A)[0])
-            amp = np.sum(A[:,gamma] * R_arr)
-
+            gamma = np.argmax(np.dot(R_vec.reshape(1,-1), A)[0])
+            amp = np.sum(A[:,gamma] * R_vec)
+            
             if amp < sig_th * sigI:
                 break
             iter_count += 1
             u = amp * A[:,gamma]
             NI_arr[gamma] += amp
-            R_arr -= u
-            f_arr += u
-            R = np.sqrt(np.mean(R_arr**2))
+            R_vec -= u
+            f_vec += u
+            R = np.sqrt(np.mean(R_vec**2))
 
         N_pred[ilc,:] = NI_arr / I_norm
+        R_arr[ilc,:] = R_vec
+        f_arr[ilc,:] = f_vec
         
-        if return_iter:
-            return N_pred[:,:N_z - N_nu], iter_count
-        #print('Light cone %d MP end in %d iterations.'%(ilc, iter_count))
-    return N_pred[:,:N_z - N_nu]
+#         print('Light cone %d MP end in %d iterations.'%(ilc, iter_count))
+    if return_iter and return_Rf:
+        return N_pred[:,:N_z - N_nu], iter_count, R_arr, f_arr
+    elif return_iter and not return_Rf:
+        return N_pred[:,:N_z - N_nu], iter_count
+    elif not return_iter and return_Rf:
+        return N_pred[:,:N_z - N_nu], R_arr, f_arr
+    else:
+        return N_pred[:,:N_z - N_nu]
 
 
 def run_lasso(A, I_norm, Iobs_all, alpha, sp2, fit_bg = False):
