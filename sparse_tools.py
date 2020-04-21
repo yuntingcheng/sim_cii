@@ -1,5 +1,5 @@
 from sklearn import preprocessing
-import cvxpy as cvx
+# import cvxpy as cvx
 from scipy import special
 from lightcone_toy_p16 import *
 from lightcone_sim_P16 import *

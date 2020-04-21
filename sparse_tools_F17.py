@@ -1,5 +1,5 @@
 from lightcone_sim_F17 import *
-import cvxpy as cvx
+# import cvxpy as cvx
 
 def run_lasso(A, I_norm, Iobs_all, alpha, fit_bg = False):
     

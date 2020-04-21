@@ -187,6 +187,12 @@ def add_line_flux(df, line_use = ['Lya', 'Ha', 'Hb', 'OII', 'OIII'], muL = [], s
         Ls_dat = dfdat[line_name + '_Ls'].values
         L_vec = 10**np.interp(z_vec, z_dat, np.log10(Ls_dat))
         L_vec = L_vec * (1 + np.random.normal(muL[jidx], sigL[jidx], len(L_vec)))
+        if line_use == 'OII':
+            rand_OII_OIII = (1 + np.random.normal(muL[jidx], sigL[jidx], len(L_vec)))
+            Lvec = L_vec * rand_OII_OIII
+        elif line_use == 'OIII':
+            Lvec = Lvec * rand_OII_OIII
+            L_vec = L_vec * (1 + np.random.normal(muL[jidx], sigL[jidx], len(L_vec)))
         F_vec = L_vec * u.Lsun / 4 / np.pi / DL_vec**2
         F_vec = F_vec.to(u.Jy * u.GHz).value
         
@@ -292,7 +298,8 @@ def Ivox_from_zsrc(zsrc_all, dth, nu_binedges, line_use, line_targ, \
     
     return I_vec_all,I_vec_targ
 
-def gen_Ipred(z_coords, N_arr, dth, nu_binedges, line_use, line_targ, model = 'Be13', verbose = 0):
+def gen_Ipred(z_coords, N_arr, dth, nu_binedges, line_use, line_targ, model = 'Be13',
+              muL = [], sigL = [], verbose = 0):
     '''
     Generate I_arr with the N_arr from sparse approx.
     
@@ -318,7 +325,8 @@ def gen_Ipred(z_coords, N_arr, dth, nu_binedges, line_use, line_targ, model = 'B
         Lratio.append(N_arr[i,:])
         
     Ipred_all, Ipred_targ = Ivox_from_zsrc(zsrc_all, dth, nu_binedges, \
-                    line_use, line_targ, Lratio = Lratio, model = model, verbose = 0)
+                    line_use, line_targ, Lratio = Lratio, model = model,
+                                           muL=muL, sigL=sigL, verbose = 0)
     
     return Ipred_all, Ipred_targ
 
@@ -366,7 +374,7 @@ def zlist_to_N(zsrc, z_coords_all, I_coords_all, z_idx, Nsrc = []):
         Nall[iset,:] = N
     return Nall
 
-def gen_lightcone_toy(Nlc, dth, nu_binedges, z_coords_all, \
+def gen_lightcone_toy(Nlc, dth, nu_binedges, z_coords_all,
                       I_coords_all, z_idx, line_use, line_targ, Neff_scale = 1, model = 'Be13'):
     
     zsrc = sim_zsrc_Neff(Nlc, dth, Neff_scale = Neff_scale, model = model)
@@ -376,8 +384,9 @@ def gen_lightcone_toy(Nlc, dth, nu_binedges, z_coords_all, \
     
     return Ntrue, Itrue_all, Itrue_targ
 
-def gen_lightcone(Nlc, dth, nu_binedges, z_coords_all, \
-                      I_coords_all, z_idx, line_use, line_targ, Neff_scale = 1, model = 'Be13'):
+def gen_lightcone(Nlc, dth, nu_binedges, z_coords_all,
+                  I_coords_all, z_idx, line_use, line_targ,
+                  muL = [], sigL = [], Neff_scale = 1, model = 'Be13'):
     
     zbinedges = np.arange(0,10 + 0.01,0.01)
     SFRbinedges = np.logspace(-3,1,100)
@@ -393,8 +402,9 @@ def gen_lightcone(Nlc, dth, nu_binedges, z_coords_all, \
     zsrc = [zbins.tolist()]*Nlc
     Nsrc = N_arr.tolist()
     Ntrue = zlist_to_N(zsrc, z_coords_all, I_coords_all, z_idx, Nsrc = Nsrc)
-    Itrue_all, Itrue_targ = gen_Ipred(z_coords_all[z_idx], Ntrue, \
-                            dth, nu_binedges, line_use, line_targ, model = model, verbose = 0)
+    Itrue_all, Itrue_targ = gen_Ipred(z_coords_all[z_idx], Ntrue, dth, nu_binedges,
+                                      line_use, line_targ, model = model, 
+                                      muL=muL, sigL=sigL, verbose = 0)
     return Ntrue, Itrue_all, Itrue_targ
 
 def sparse_dict(dth, nu_binedges, line_use, dz = 0.0005, model = 'Be13'):

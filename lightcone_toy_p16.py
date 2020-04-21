@@ -311,7 +311,7 @@ def gen_lightcone_toy(Nlc, dth, nu_binedges, sp2, z_coords_all, I_coords_all, z_
     
     return Ntrue, Itrue_all, Itrue_targ
 
-def gen_lightcone(Nlc, dth, nu_binedges, sp2, z_coords_all, I_coords_all, z_idx, juse, jtarg, Neff_scale = 1, sigL = []):
+def gen_lightcone(Nlc, dth, nu_binedges, sp2, z_coords_all, I_coords_all, z_idx, juse, jtarg, Neff_scale = 1, sigL = [], muL = []):
 
     L_arr1, N_arr1, zbins = sim_Llc_P16(Nlc, dth, jco = 1, Neff_scale = Neff_scale)
     L_arr2, N_arr2, zbins = sim_Llc_P16(Nlc, dth, jco = 0, Neff_scale = Neff_scale)
@@ -320,7 +320,7 @@ def gen_lightcone(Nlc, dth, nu_binedges, sp2, z_coords_all, I_coords_all, z_idx,
     N_arr[:, zbins > 5] = N_arr2[:, zbins > 5]
     zsrc = [zbins.tolist()]*Nlc
     Itrue_all, Itrue_targ = Ivox_from_zsrc(zsrc, dth, nu_binedges, juse, jtarg, 
-                                           Lratio = N_arr.tolist(), sigL = sigL, verbose=0)
+                                           Lratio = N_arr.tolist(), sigL = sigL, muL = muL, verbose=0)
     Nsrc = N_arr.tolist()
     Ntrue = zlist_to_N(zsrc, z_coords_all, I_coords_all, z_idx, sp2, Nsrc = Nsrc)
     Ntrue = Ntrue[:,sp2]
