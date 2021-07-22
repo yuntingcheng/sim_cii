@@ -134,7 +134,7 @@ def SFR_func_Be13(z, sfr_arr = []):
 
 def SFRs_Be13(z):
     '''
-    Return SFRD of Be13 model.
+    Return SFRs of Be13 model.
     Inputs:
     =======
     z: redshift, for z between the listed data, the Schechter params are linearly interpolate.
@@ -446,7 +446,7 @@ def Lline_F17(line_name, z, sfr_arr):
     f^line_esc = 10^(-E_line / 2.5)
     Input:
     ======
-    line_name: line name - ['Lya', 'Lyb', 'Hb', 'OII', 'OII']
+    line_name: line name - ['Lya', 'Ha', 'Hb', 'OII', 'OII']
     z: redshift
     sfr_arr: [Msun / yr]
     

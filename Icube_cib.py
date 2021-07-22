@@ -124,6 +124,7 @@ def _select_df(line_class,df):
     '''
     df_new = df[(df.ra >= line_class.xmin) & (df.ra <= line_class.xmax) & \
                 (df.dec >= line_class.ymin) & (df.dec <= line_class.ymax)].copy()
+    df_new['LIR'] = df_new['SFR'] * 1e10
     df_new = df_new[['redshift', 'ra', 'dec', 'issb', 'Umean','mu','LIR',\
            'Dlum','ICO10', 'ICO21', 'ICO32', 'ICO43', 'ICO54', 'ICO65', 'ICO76', 'ICO87', 'ICII']].copy()
     line_class.df = df_new
